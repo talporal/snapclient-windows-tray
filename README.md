@@ -12,13 +12,13 @@ Authenticated local users can control this shared office player through an ACL-p
 
 ## Install and configure
 
-Download the `SnapcastWindows-x64` build artifact from Actions and run its installer as an administrator. Both the service and tray app are installed. Enter the Snapserver hostname/IP in the tray controls and save. Default Snapcast ports are audio 1704 and TCP control 1705; match the actual server configuration (Music Assistant may expose different ports/transports). Volume and name controls require the TCP control API to be reachable. Use List devices to select a physical output visible to LocalService. Avoid an RDP session-only output.
+Download the `SnapcastWindows-x64` build artifact from Actions and run its installer as an administrator. Both the service and tray app are installed. Enter the Snapserver hostname/IP in the tray controls and save. The Music Assistant preset selects WebSocket audio and HTTP control on 1780. Plain Snapcast defaults are TCP audio 1704 and TCP control 1705; match the actual server configuration (Music Assistant may expose different ports/transports). Volume and name controls require the selected TCP or HTTP(S) control API to be reachable. WebSocket and secure WebSocket audio are supported; secure connections use normal certificate verification. Use List devices to select a physical output visible to LocalService. Avoid an RDP session-only output.
 
 Installer enables Windows Audio and Audio Endpoint Builder automatic startup and registers SnapcastWindows with service recovery. Upgrades stop the old service and tray process. Uninstall preserves configuration. The service plays only when enabled and a host is configured.
 
 ## Build
 
-The Actions workflow uses **only** `[self-hosted, Windows]`, matching windows-ha-sidebar's existing workflow. No GitHub-hosted fallback and no untrusted pull-request trigger. A repository-scoped runner from another repository must also be registered for this repository; matching labels alone do not share it.
+The Actions workflow uses **only** `[self-hosted, Windows]`, matching windows-ha-sidebar's existing workflow. The active build bridge is `.github/workflows/snapcast.yml` on windows-ha-sidebar branch `build/snapcast`, using existing runner T-NET-SERVER. It checks out a pinned Snapcast commit, builds this app only, and places installer artifacts on that repository's run. The local workflow is manual-only for future direct runner registration. No GitHub-hosted fallback and no untrusted pull-request trigger. A repository-scoped runner from another repository must also be registered for this repository; matching labels alone do not share it.
 
 Requirements on the Windows build machine: Windows SDK 26100, compatible WinUI XAML build tools and .NET 8 SDK. Workflow installs .NET into the runner temporary directory. The same Windows App SDK package version as the working sidebar is used. Inno Setup is initialized in the runner temp directory; the build does not install/start this application's service on the build PC.
 

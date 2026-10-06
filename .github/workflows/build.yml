@@ -1,7 +1,5 @@
 name: Windows self-hosted build
 on:
-  push:
-    branches: [main, 'feature/**']
   workflow_dispatch:
 permissions:
   contents: read

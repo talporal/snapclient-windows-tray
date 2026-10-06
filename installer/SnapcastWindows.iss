@@ -30,7 +30,6 @@ Name: "{group}\Uninstall Snapcast Windows"; Filename: "{uninstallexe}"
 Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "SnapcastWindowsTray"; ValueData: """{app}\Tray\Snapcast.Tray.exe"" --background"; Flags: uninsdeletevalue
 [Run]
 Filename: "{tmp}\vc_redist.exe"; Parameters: "/install /quiet /norestart"; Flags: waituntilterminated; StatusMsg: "Installing audio runtime…"
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Scripts\install-service.ps1"" -InstallRoot ""{app}"""; Flags: runhidden waituntilterminated; StatusMsg: "Installing background audio service…"
 Filename: "{app}\Tray\Snapcast.Tray.exe"; Description: "Open Snapcast controls"; Flags: postinstall nowait skipifsilent runasoriginaluser
 [UninstallRun]
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Scripts\uninstall-service.ps1"""; Flags: runhidden waituntilterminated
@@ -45,3 +44,14 @@ begin
   end;
 end;
 
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var ExitCode: Integer;
+begin
+  if CurStep = ssPostInstall then begin
+    if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), '-NoProfile -ExecutionPolicy Bypass -File "'+ExpandConstant('{app}\Scripts\install-service.ps1')+'" -InstallRoot "'+ExpandConstant('{app}')+'"', '', SW_HIDE, ewWaitUntilTerminated, ExitCode) then
+      RaiseException('Unable to run service installation.')
+    else if ExitCode <> 0 then
+      RaiseException('Background service installation failed. Check Windows Audio services and administrator permissions.');
+  end;
+end;

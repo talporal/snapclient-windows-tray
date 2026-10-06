@@ -8,5 +8,8 @@ if(roundtrip!=config)throw new Exception("Configuration roundtrip lost data.");
 var argsList=config.Arguments();
 if(argsList[Array.IndexOf(argsList,"--soundcard")+1]!=config.Soundcard)throw new Exception("Device name was not retained as one argument.");
 if(argsList[Array.IndexOf(argsList,"--hostID")+1]!=config.ClientId)throw new Exception("Client identity lost.");
+var ipv6=new Settings{Host="::1",Transport="ws",StreamPort=1780};
+if(ipv6.Arguments()[^1]!="ws://[::1]:1780")throw new Exception("IPv6 endpoint incorrectly formatted.");
+Reject(new(){Transport="file"});Reject(new(){ControlTransport="ftp"});
 Console.WriteLine("Configuration, identity, and argument checks passed.");
 

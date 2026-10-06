@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net.Sockets;
+using System.Net.Http;
+using System.Text;
 using System.Text.Json;
 using Snapcast.Core;
 namespace Snapcast.Service;
@@ -66,6 +68,15 @@ public sealed class Engine {
         try {
             var config=Config;
             using var timeout=CancellationTokenSource.CreateLinkedTokenSource(token); timeout.CancelAfter(5000);
+            if(config.ControlTransport != "tcp") {
+                using var http = new HttpClient();
+                var uri = new UriBuilder(config.ControlTransport,config.Host,config.ControlPort,"jsonrpc").Uri;
+                using var body = new StringContent(JsonSerializer.Serialize(new {jsonrpc="2.0",id=1,method,@params=parameters},Protocol.Json),Encoding.UTF8,"application/json");
+                using var reply = await http.PostAsync(uri,body,timeout.Token);reply.EnsureSuccessStatusCode();
+                using var document=JsonDocument.Parse(await reply.Content.ReadAsStringAsync(timeout.Token));
+                if(document.RootElement.TryGetProperty("error",out var rpcError)) throw new IOException(rpcError.ToString());
+                return document.RootElement.GetProperty("result").Clone();
+            }
             using var tcp=new TcpClient();
             await tcp.ConnectAsync(config.Host,config.ControlPort,timeout.Token);
             using var stream=tcp.GetStream();
@@ -88,7 +99,11 @@ public sealed class Engine {
         var result=await Rpc("Server.GetStatus",null,token);
         foreach(var group in result.GetProperty("server").GetProperty("groups").EnumerateArray())
             foreach(var client in group.GetProperty("clients").EnumerateArray())
-                if(client.GetProperty("id").GetString()==Config.ClientId && client.GetProperty("connected").GetBoolean()) return true;
+                if(client.GetProperty("id").GetString()==Config.ClientId && client.GetProperty("connected").GetBoolean()) {
+                    if(client.GetProperty("config").GetProperty("name").GetString()!=Config.Name)
+                        await Rpc("Client.SetName",new{id=Config.ClientId,name=Config.Name},token);
+                    return true;
+                }
         return false;
     }
     public async Task<string> Devices(CancellationToken token) {

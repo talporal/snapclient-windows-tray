@@ -4,6 +4,8 @@ using System.Text.Json;
 namespace Snapcast.Core;
 public record Settings {
     public string Host { get; init; } = "";
+    public string Transport { get; init; } = "tcp";
+    public string ControlTransport { get; init; } = "tcp";
     public int StreamPort { get; init; } = 1704;
     public int ControlPort { get; init; } = 1705;
     public string Soundcard { get; init; } = "default";
@@ -16,6 +18,7 @@ public record Settings {
     public string LogLevel { get; init; } = "info";
     public void Validate() {
         if (Host.Length > 253 || Host.Any(c => char.IsWhiteSpace(c) || "/\\\"".Contains(c)) || (Host.Length > 0 && Uri.CheckHostName(Host) == UriHostNameType.Unknown)) throw new ArgumentException("Enter a hostname or IP address, without a port or URL.");
+        if (!new[]{"tcp","ws","wss"}.Contains(Transport) || !new[]{"tcp","http","https"}.Contains(ControlTransport)) throw new ArgumentException("Invalid transport.");
         if (StreamPort is < 1 or > 65535 || ControlPort is < 1 or > 65535) throw new ArgumentException("Ports must be 1–65535.");
         if (Latency is < -10000 or > 10000) throw new ArgumentException("Latency must be between -10000 and 10000 ms.");
         if (Soundcard.Length > 1024 || Name.Length > 128 || ClientId.Length != 32 || !ClientId.All(Uri.IsHexDigit)) throw new ArgumentException("Invalid device, name or client identity.");
@@ -24,8 +27,11 @@ public record Settings {
     }
     public string[] Arguments() {
         Validate();
-        var args = new List<string>{"--host",Host,"--port",StreamPort.ToString(),"--hostID",ClientId,"--player","wasapi","--soundcard",Soundcard,"--latency",Latency.ToString(),"--sharingmode",Exclusive?"exclusive":"shared","--logsink","stdout","--logfilter","*:"+LogLevel};
+        var args = new List<string>{"--hostID",ClientId,"--player","wasapi","--soundcard",Soundcard,"--latency",Latency.ToString(),"--sharingmode",Exclusive?"exclusive":"shared","--logsink","stdout","--logfilter","*:"+LogLevel};
         if (SampleFormat != "") args.AddRange(new[]{"--sampleformat",SampleFormat});
+        if (Transport == "wss") args.AddRange(new[]{"--server-cert","default certificates"});
+        var host = Host.Contains(':') ? "["+Host+"]" : Host;
+        args.Add($"{Transport}://{host}:{StreamPort}");
         return args.ToArray();
     }
 }

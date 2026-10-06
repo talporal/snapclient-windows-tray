@@ -18,7 +18,16 @@ Installer enables Windows Audio and Audio Endpoint Builder automatic startup and
 
 ## Build
 
-The Actions workflow uses **only** `[self-hosted, Windows]`, matching windows-ha-sidebar's existing workflow. The active build bridge is `.github/workflows/snapcast.yml` on windows-ha-sidebar branch `build/snapcast`, using existing runner T-NET-SERVER. It checks out a pinned Snapcast commit, builds this app only, and places installer artifacts on that repository's run. The local workflow is manual-only for future direct runner registration. No GitHub-hosted fallback and no untrusted pull-request trigger. A repository-scoped runner from another repository must also be registered for this repository; matching labels alone do not share it.
+The Actions workflow runs directly in this repository on a Windows x64 self-hosted runner with the custom label `snapcast`. It builds main-branch code changes and supports manual dispatch. Installers and logs appear under this repository's Actions tab. There is no GitHub-hosted fallback or pull-request trigger. The temporary windows-ha-sidebar build bridge has been retired.
+
+### One-time home runner registration
+
+1. Open https://github.com/talporal/snapclient-windows-tray/settings/actions/runners/new and select Windows, x64.
+2. On T-NET-SERVER, open PowerShell as administrator and follow GitHub's download/extraction commands in a new directory such as `C:\\actions-runner-snapcast`.
+3. Run GitHub's generated configuration command for this repository. Use runner name `T-NET-SERVER-SNAPCAST`, add custom label `snapcast`, and choose installation as a Windows service. Keep this installation separate from the sidebar runner's directory.
+4. Confirm the new runner is online in this repository's runner settings. Pending builds with the `snapcast` label can then run.
+
+The registration token is time-limited; enter it only on the host using GitHub's generated command. Do not commit it. Runner registration and Windows service installation require repository administration and access to the host; the connected code-editing tools cannot perform those steps.
 
 Requirements on the Windows build machine: Windows SDK 26100, compatible WinUI XAML build tools and .NET 8 SDK. Workflow installs .NET into the runner temporary directory. The same Windows App SDK package version as the working sidebar is used. Inno Setup is initialized in the runner temp directory; the build does not install/start this application's service on the build PC.
 

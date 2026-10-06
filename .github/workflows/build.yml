@@ -1,4 +1,4 @@
-name: Windows self-hosted build
+name: Windows build and release
 on:
   workflow_dispatch:
   push:
@@ -9,19 +9,38 @@ on:
       - 'installer/**'
       - 'Directory.Build.props'
       - '.github/workflows/build.yml'
+      - '.github/scripts/**'
 permissions:
-  contents: read
+  contents: write
+  actions: write
 concurrency:
   group: snapcast-build-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   build:
-    runs-on: [self-hosted, Windows, X64, snapcast]
+    runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 40
     steps:
+      - name: Verify requested home runner
+        shell: powershell
+        env:
+          ACTUAL_RUNNER: ${{ runner.name }}
+        run: |
+          if ($env:ACTUAL_RUNNER -ine 't-net-home') { throw "Expected t-net-home, assigned runner: $env:ACTUAL_RUNNER" }
+          Write-Host "Building on $env:ACTUAL_RUNNER."
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+          clean: true
+      - name: Remove old artifacts and cancel previous builds
+        shell: powershell
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: .\.github\scripts\cleanup-actions.ps1 -CancelQueuedBuilds
+      - name: Clean compilation outputs
+        shell: powershell
+        run: |
+          Get-ChildItem src,tests -Directory -Recurse | Where-Object { $_.Name -in @('bin','obj') } | Sort-Object { $_.FullName.Length } -Descending | Remove-Item -Recurse -Force
       - name: Set writable .NET install directory
         shell: powershell
         run: '"DOTNET_INSTALL_DIR=$env:RUNNER_TEMP\dotnet" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append'
@@ -33,13 +52,11 @@ jobs:
         run: |
           dotnet run --project tests/Snapcast.Checks/Snapcast.Checks.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Configuration checks failed.' }
-      - name: Build installer
+      - name: Build installer from source
         shell: powershell
-        run: .\installer\build.ps1 -Version '0.1.0.${{ github.run_number }}' -OutputDirectory "$env:RUNNER_TEMP\snapcast-output-${{ github.run_id }}"
-      - uses: actions/upload-artifact@v6
-        with:
-          name: SnapcastWindows-x64
-          path: ${{ runner.temp }}\snapcast-output-${{ github.run_id }}\SnapcastWindows-*.exe
-          if-no-files-found: error
-          retention-days: 7
-
+        run: .\installer\build.ps1 -Version '0.1.1.${{ github.run_number }}' -OutputDirectory "$env:RUNNER_TEMP\snapcast-output-${{ github.run_id }}"
+      - name: Publish installer directly to GitHub Releases
+        shell: powershell
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: .\.github\scripts\publish-release.ps1 -Directory "$env:RUNNER_TEMP\snapcast-output-${{ github.run_id }}" -Title 'Snapcast Windows'

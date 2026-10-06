@@ -12,20 +12,20 @@ Authenticated local users can control this shared office player through an ACL-p
 
 ## Install and configure
 
-Download the `SnapcastWindows-x64` build artifact from Actions and run its installer as an administrator. Both the service and tray app are installed. Enter the Snapserver hostname/IP in the tray controls and save. The Music Assistant preset selects WebSocket audio and HTTP control on 1780. Plain Snapcast defaults are TCP audio 1704 and TCP control 1705; match the actual server configuration (Music Assistant may expose different ports/transports). Volume and name controls require the selected TCP or HTTP(S) control API to be reachable. WebSocket and secure WebSocket audio are supported; secure connections use normal certificate verification. Use List devices to select a physical output visible to LocalService. Avoid an RDP session-only output.
+Download the installer from this repository's Releases and run its installer as an administrator. Both the service and tray app are installed. Enter the Snapserver hostname/IP in the tray controls and save. The Music Assistant preset selects WebSocket audio and HTTP control on 1780. Plain Snapcast defaults are TCP audio 1704 and TCP control 1705; match the actual server configuration (Music Assistant may expose different ports/transports). Volume and name controls require the selected TCP or HTTP(S) control API to be reachable. WebSocket and secure WebSocket audio are supported; secure connections use normal certificate verification. Use List devices to select a physical output visible to LocalService. Avoid an RDP session-only output.
 
 Installer enables Windows Audio and Audio Endpoint Builder automatic startup and registers SnapcastWindows with service recovery. Upgrades stop the old service and tray process. Uninstall preserves configuration. The service plays only when enabled and a host is configured.
 
 ## Build
 
-The Actions workflow runs directly in this repository on a Windows x64 self-hosted runner with the custom label `snapcast`. It builds main-branch code changes and supports manual dispatch. Installers and logs appear under this repository's Actions tab. There is no GitHub-hosted fallback or pull-request trigger. The temporary windows-ha-sidebar build bridge has been retired.
+The Actions workflow runs directly in this repository on a Windows x64 self-hosted runner named `t-net-home`. It builds main-branch code changes and supports manual dispatch. Every successful build publishes its installer directly as a development release. Build logs remain under Actions. Actions artifact uploads are not used. There is no GitHub-hosted fallback or pull-request trigger. The temporary windows-ha-sidebar build bridge has been retired.
 
 ### One-time home runner registration
 
 1. Open https://github.com/talporal/snapclient-windows-tray/settings/actions/runners/new and select Windows, x64.
 2. On T-NET-SERVER, open PowerShell as administrator and follow GitHub's download/extraction commands in a new directory such as `C:\\actions-runner-snapcast`.
-3. Run GitHub's generated configuration command for this repository. Use runner name `T-NET-SERVER-SNAPCAST`, add custom label `snapcast`, and choose installation as a Windows service. Keep this installation separate from the sidebar runner's directory.
-4. Confirm the new runner is online in this repository's runner settings. Pending builds with the `snapcast` label can then run.
+3. Run GitHub's generated configuration command for this repository. Use runner name `t-net-home`, and choose installation as a Windows service. Keep this installation separate from the sidebar runner's directory.
+4. Confirm the new runner is online in this repository's runner settings. Builds require the standard self-hosted, Windows and X64 labels and verify the runner name before compilation.
 
 The registration token is time-limited; enter it only on the host using GitHub's generated command. Do not commit it. Runner registration and Windows service installation require repository administration and access to the host; the connected code-editing tools cannot perform those steps.
 

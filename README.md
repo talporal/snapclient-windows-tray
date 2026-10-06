@@ -18,13 +18,13 @@ Installer enables Windows Audio and Audio Endpoint Builder automatic startup and
 
 ## Build
 
-The Actions workflow runs directly in this repository on a Windows x64 self-hosted runner named `t-net-home`. It builds main-branch code changes and supports manual dispatch. Every successful build publishes its installer directly as a development release. Build logs remain under Actions. Actions artifact uploads are not used. There is no GitHub-hosted fallback or pull-request trigger. The temporary windows-ha-sidebar build bridge has been retired.
+The Actions workflow runs directly in this repository on a Windows x64 self-hosted runner named `T-NET-SERVER`. It builds main-branch code changes and supports manual dispatch. Every successful build publishes its installer directly as a development release. Build logs remain under Actions. Actions artifact uploads are not used. There is no GitHub-hosted fallback or pull-request trigger. The temporary windows-ha-sidebar build bridge has been retired.
 
 ### One-time home runner registration
 
 1. Open https://github.com/talporal/snapclient-windows-tray/settings/actions/runners/new and select Windows, x64.
 2. On T-NET-SERVER, open PowerShell as administrator and follow GitHub's download/extraction commands in a new directory such as `C:\\actions-runner-snapcast`.
-3. Run GitHub's generated configuration command for this repository. Use runner name `t-net-home`, and choose installation as a Windows service. Keep this installation separate from the sidebar runner's directory.
+3. Run GitHub's generated configuration command for this repository. Use runner name `T-NET-SERVER`, and choose installation as a Windows service. Keep this installation separate from the sidebar runner's directory.
 4. Confirm the new runner is online in this repository's runner settings. Builds require the standard self-hosted, Windows and X64 labels and verify the runner name before compilation.
 
 The registration token is time-limited; enter it only on the host using GitHub's generated command. Do not commit it. Runner registration and Windows service installation require repository administration and access to the host; the connected code-editing tools cannot perform those steps.

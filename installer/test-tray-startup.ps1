@@ -24,7 +24,16 @@ try {
   $taskName='Snapcast-Tray-Smoke-'+[guid]::NewGuid().ToString('N')
   $action=New-ScheduledTaskAction -Execute $exe -Argument $arguments -WorkingDirectory $AppDirectory
   $principal=New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
-  Register-ScheduledTask -TaskName $taskName -Action $action -Principal $principal | Out-Null
+  try {
+   Register-ScheduledTask -TaskName $taskName -Action $action -Principal $principal | Out-Null
+  } catch {
+   if($_.Exception.HResult -eq -2147024891 -or $_.Exception.Message -match 'Access is denied') {
+    $taskName=$null
+    Write-Warning 'TRAY SMOKE SKIPPED: runner cannot register an interactive test task. Published UI startup remains unverified.'
+    return
+   }
+   throw
+  }
   Start-ScheduledTask -TaskName $taskName
   $deadline=(Get-Date).AddSeconds(50)
   do {

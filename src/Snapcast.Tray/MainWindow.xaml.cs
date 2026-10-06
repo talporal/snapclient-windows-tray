@@ -5,7 +5,7 @@ using System.ComponentModel;
 namespace Snapcast.Tray;
 public sealed partial class MainWindow : Window {
     TrayIcon? tray;
-    readonly DispatcherTimer timer=new(){Interval=TimeSpan.FromSeconds(5)};
+    readonly DispatcherTimer timer;
     readonly bool smoke;
     Settings config=new(); bool loaded,busy,exiting,closed,controllingService;
     public MainWindow(bool smoke=false) {
@@ -13,6 +13,7 @@ public sealed partial class MainWindow : Window {
         StartupDiagnostics.Write("Loading settings window XAML.");
         InitializeComponent();
         StartupDiagnostics.Write("Settings window XAML loaded.");
+        timer=new DispatcherTimer {Interval=TimeSpan.FromSeconds(5)};
     }
     public void InitializeTray(bool background) {
         // Initialize WinUI's native window before using its HWND or creating shell integration.

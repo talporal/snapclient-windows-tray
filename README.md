@@ -52,3 +52,5 @@ If LocalService cannot render to the target driver/device in Session 0, diagnose
 
 No automatic app updates, mDNS discovery, server group/stream editor, or installer code-signing yet. Hostname/IP persistence provides automatic connection. Tray volume starts at 50 as a proposed control value; the UI does not yet mirror server-side volume changes. Diagnostics report process state separately from server-confirmed connection; they do not claim audible output.
 
+
+The packaging check launches the published tray in an interactive desktop when available. A service runner without permission to create an interactive test task reports startup as unverified; this is not a successful UI test. Tray startup diagnostics are written to `%LOCALAPPDATA%\SnapcastWindows\tray-startup.log`.

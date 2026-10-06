@@ -12,6 +12,7 @@ public partial class App : Application {
         StartupDiagnostics.Write("Application XAML resources loaded.");
     }
     protected override void OnLaunched(LaunchActivatedEventArgs args) {
+        StartupDiagnostics.Write("Tray launch event received.");
         var commands=Environment.GetCommandLineArgs();
         var smoke=commands.Contains("--smoke-test");
         try {
@@ -25,6 +26,7 @@ public partial class App : Application {
                 }
                 openEvent=new EventWaitHandle(false,EventResetMode.AutoReset,eventName);
             }
+            StartupDiagnostics.Write("Creating settings window.");
             window=new MainWindow(smoke);
             window.InitializeTray(background:smoke||commands.Contains("--background"));
             if(smoke) {

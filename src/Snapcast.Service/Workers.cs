@@ -57,13 +57,13 @@ public sealed class ControlWorker(Engine engine) : BackgroundService {
     async Task<Response> Handle(Request request,CancellationToken token) {
         switch(request.Command) {
             case "status":
-                bool connected=false;string message="Waiting for configuration";
+                bool connected=false,playing=false;string message="Waiting for configuration";
                 if(engine.Config.Host!="") {
-                    try { connected=await engine.Connected(token); message=connected?"Connected to Snapserver":"Audio engine disconnected or starting"; }
-                    catch(Exception e) { message="Engine running; control status unavailable: "+e.Message; }
+                    try { var state=await engine.Playback(token);connected=state.Connected;playing=state.Playing;message=playing?"Server stream playing":connected?"Connected to Snapserver (idle or muted)":"Audio engine disconnected or starting"; }
+                    catch(Exception e) { message=(engine.Running?"Engine running; control status unavailable: ":"Audio engine stopped; control status unavailable: ")+e.Message; }
                 }
                 if(!engine.Config.Enabled) message="Playback disabled";
-                return new(true,message,engine.Config,engine.Running,connected,engine.Logs);
+                return new(true,message,engine.Config,engine.Running,connected,engine.Logs,Playing:playing);
             case "save": engine.Save(request.Settings ?? throw new ArgumentException("Missing settings."));return new(true,"Saved. Audio engine will reconnect.");
             case "restart": engine.Restart();return new(true,"Reconnect requested.");
             case "devices": return new(true,"Audio devices visible to the service",Devices:await engine.Devices(token));

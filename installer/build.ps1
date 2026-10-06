@@ -8,6 +8,7 @@ foreach($component in @('Service','Tray')) {
  dotnet publish (Join-Path $root "src\Snapcast.$component\Snapcast.$component.csproj") -c Release -r win-x64 -p:Platform=x64 -p:Version=$Version --self-contained true -p:WindowsAppSDKSelfContained=true -o (Join-Path $stage $component)
  if($LASTEXITCODE -ne 0){throw "$component publish failed."}
 }
+& (Join-Path $PSScriptRoot 'test-tray-startup.ps1') -AppDirectory (Join-Path $stage 'Tray')
 $zip=Join-Path $stage 'snapclient.zip'
 Invoke-WebRequest -UseBasicParsing 'https://github.com/snapcast/snapcast/releases/download/v0.35.0/snapclient_win64.zip' -OutFile $zip
 if((Get-FileHash $zip -Algorithm SHA256).Hash.ToLower() -ne '5a5fbabe0c1b8dea09542f0334af16c6eac9072c287fa6501bd7ff1f487bbf01'){throw 'Snapclient checksum mismatch.'}
@@ -21,6 +22,9 @@ Copy-Item (Join-Path $client.Directory.FullName '*') $engine -Recurse
 $redist=Get-ChildItem $unpack -Recurse -Filter '*redist*.exe' | Select-Object -First 1
 if(!$redist){throw 'Upstream package contains no VC runtime installer.'}
 Copy-Item $redist.FullName (Join-Path $stage 'vc_redist.exe')
+# Runtime installer is needed only during setup, not in the audio engine folder.
+Get-ChildItem $engine -Recurse -Filter '*redist*.exe' | Remove-Item -Force
+if(Get-ChildItem $engine -Recurse -Filter '*redist*.exe'){throw 'Duplicate runtime installer remains in engine payload.'}
 $signature=Get-AuthenticodeSignature (Join-Path $stage 'vc_redist.exe')
 if($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Corporation'){throw 'VC runtime signature invalid.'}
 # Include exact corresponding upstream source and license for the bundled GPL engine.
@@ -45,5 +49,6 @@ if(!(Test-Path $iscc)) {
 }
 & $iscc "--define=SourceRoot=$stage" "--define=AppVersion=$Version" "--define=OutputDir=$((Resolve-Path $OutputDirectory).Path)" (Join-Path $PSScriptRoot 'SnapcastWindows.iss')
 if($LASTEXITCODE -ne 0){throw 'Installer compilation failed.'}
+Write-Host ('Installer bytes: '+(Get-Item (Join-Path $OutputDirectory "SnapcastWindows-$Version-x64.exe")).Length)
 Get-FileHash (Join-Path $OutputDirectory "SnapcastWindows-$Version-x64.exe") | Format-List
 

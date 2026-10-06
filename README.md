@@ -6,7 +6,7 @@ C# Windows service and WinUI 3 tray controls. Target: Windows 11 and Windows Ser
 
 The boot-start LocalService service owns the bundled Snapclient process in Session 0. It supervises crashes with bounded retry intervals. A kernel job closes child processes when the service exits. Snapclient handles streaming and synchronization; the tray app is included in the installer but is not required for playback. No interactive auto-login is configured.
 
-The tray app starts at sign-in and provides host/audio/control ports, automatic playback, player name, device listing from the service session, output selection, shared/exclusive mode, resampling, latency, volume/mute, reconnect, and a bounded diagnostic log. Closing the window hides it; Exit tray leaves the service running. Stream routing, buffering and office playlist automation remain server/Music Assistant responsibilities.
+The tray app starts at sign-in and provides host/audio/control ports, automatic playback, player name, device listing from the service session, output selection, shared/exclusive mode, resampling, latency, volume/mute, reconnect, and a bounded diagnostic log. Closing the window hides it. Right-click the custom play/network-wave tray icon for Open GUI, Restart service, and Exit app. Exit asks whether to keep playback running or stop the service. Service restart/stop uses a fixed installed helper with Windows administrator approval; cancelling approval leaves the tray open. Icon color reflects server-confirmed stream activity: green playing, cyan connected/idle, grey disconnected, red service/status unavailable. This reports Snapserver status, not a physical speaker measurement. Stream routing, buffering and office playlist automation remain server/Music Assistant responsibilities.
 
 Authenticated local users can control this shared office player through an ACL-protected named pipe. Network logons are denied pipe access. Configuration is in `%ProgramData%\SnapcastWindows`; executable paths are fixed in Program Files and cannot be configured through IPC. Administrators and the service can write stored settings; other users can submit validated changes through the pipe. Use this only where signed-in local users are trusted to control office playback.
 
@@ -28,13 +28,19 @@ Requirements on the Windows build machine: Windows SDK 26100, compatible WinUI X
 
 Snapclient download is version-pinned and SHA-256 checked. The VC runtime and installer bootstrapper signatures are checked. The installer includes .NET/Windows App SDK runtimes, the Snapclient engine and exact upstream source archive.
 
+## Tray startup diagnostics
+
+The tray startup log is `%LOCALAPPDATA%\SnapcastWindows\tray-startup.log`. Published GUI initialization and icon assets are checked during packaging with `--smoke-test`; the check does not install or control a service. The window is activated before shell integration and hidden for background launches. Tray registration retries if Explorer is not ready, and opening the app again signals the existing per-session instance to show the GUI. Fatal startup exceptions are recorded and reported.
+
+The VC runtime bootstrapper is included only once for setup; upgrades remove the previous duplicate from the engine directory.
+
 ## Required physical-host acceptance checks
 
 **Not yet verified on the target host.** A successful compile is not proof of service-session sound.
 
 1. Install, configure server/device and confirm speakers produce audio.
 2. Reboot, leave the machine at the login screen, send playback from HA/MA and confirm sound physically.
-3. Sign in, change volume/output, exit the tray app, then log out; confirm audio continues.
+3. Sign in, change volume/output; use Exit tray only, then log out and confirm audio continues. Reopen the GUI; verify Restart service, Cancel exit, and Stop service and exit, including cancelled UAC approval.
 4. Disconnect/reconnect network; restart Snapserver; confirm recovery.
 5. Unplug/replug the output device and inspect recovery/logs.
 6. Connect/disconnect RDP and verify physical output remains selected.

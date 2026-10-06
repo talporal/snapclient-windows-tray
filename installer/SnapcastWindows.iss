@@ -16,6 +16,8 @@ OutputBaseFilename=SnapcastWindows-{#AppVersion}-x64
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile={#SourceRoot}\Tray\Assets\Snapcast.ico
+UninstallDisplayIcon={app}\Tray\Snapcast.Tray.exe
 CloseApplications=yes
 [Files]
 Source: "{#SourceRoot}\Tray\*"; DestDir: "{app}\Tray"; Flags: recursesubdirs createallsubdirs ignoreversion
@@ -32,7 +34,7 @@ Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 Filename: "{tmp}\vc_redist.exe"; Parameters: "/install /quiet /norestart"; Flags: waituntilterminated; StatusMsg: "Installing audio runtime…"
 Filename: "{app}\Tray\Snapcast.Tray.exe"; Description: "Open Snapcast controls"; Flags: postinstall nowait skipifsilent runasoriginaluser
 [UninstallRun]
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Scripts\uninstall-service.ps1"""; Flags: runhidden waituntilterminated
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Scripts\uninstall-service.ps1"""; Flags: runhidden waituntilterminated; RunOnceId: "RemoveSnapcastService"
 [Code]
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var Code: Integer;
@@ -49,9 +51,18 @@ procedure CurStepChanged(CurStep: TSetupStep);
 var ExitCode: Integer;
 begin
   if CurStep = ssPostInstall then begin
+    DeleteFile(ExpandConstant('{app}\Service\engine\vc_redist.x64.exe'));
     if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), '-NoProfile -ExecutionPolicy Bypass -File "'+ExpandConstant('{app}\Scripts\install-service.ps1')+'" -InstallRoot "'+ExpandConstant('{app}')+'"', '', SW_HIDE, ewWaitUntilTerminated, ExitCode) then
       RaiseException('Unable to run service installation.')
     else if ExitCode <> 0 then
       RaiseException('Background service installation failed. Check Windows Audio services and administrator permissions.');
+  end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var ExitCode: Integer;
+begin
+  if CurUninstallStep = usPostUninstall then begin
+    DeleteFile(ExpandConstant('{app}\Service\engine\vc_redist.x64.exe'));
   end;
 end;

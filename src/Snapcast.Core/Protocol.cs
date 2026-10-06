@@ -36,7 +36,7 @@ public record Settings {
     }
 }
 public record Request(string Command, Settings? Settings = null, int Volume = 50, bool Muted = false);
-public record Response(bool Ok, string Message, Settings? Settings = null, bool ProcessRunning = false, bool Connected = false, string[]? Logs = null, string? Devices = null);
+public record Response(bool Ok, string Message, Settings? Settings = null, bool ProcessRunning = false, bool Connected = false, string[]? Logs = null, string? Devices = null, bool Playing = false);
 public static class Protocol {
     public const string PipeName = "SnapcastWindows.Control.v1";
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);

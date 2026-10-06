@@ -94,17 +94,13 @@ public sealed class Engine {
             throw new IOException("No matching server reply.");
         } finally { rpcGate.Release(); }
     }
-    public async Task<bool> Connected(CancellationToken token) {
-        if(!Running || Config.Host=="") return false;
+    public async Task<PlaybackState> Playback(CancellationToken token) {
+        if(!Running || Config.Host=="") return new(false,false,null);
         var result=await Rpc("Server.GetStatus",null,token);
-        foreach(var group in result.GetProperty("server").GetProperty("groups").EnumerateArray())
-            foreach(var client in group.GetProperty("clients").EnumerateArray())
-                if(client.GetProperty("id").GetString()==Config.ClientId && client.GetProperty("connected").GetBoolean()) {
-                    if(client.GetProperty("config").GetProperty("name").GetString()!=Config.Name)
-                        await Rpc("Client.SetName",new{id=Config.ClientId,name=Config.Name},token);
-                    return true;
-                }
-        return false;
+        var state=PlaybackStatus.Read(result,Config.ClientId);
+        if(state.Connected && state.Name!=Config.Name)
+            await Rpc("Client.SetName",new{id=Config.ClientId,name=Config.Name},token);
+        return state;
     }
     public async Task<string> Devices(CancellationToken token) {
         var info=new ProcessStartInfo(Exe){UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true};

@@ -13,3 +13,14 @@ if(ipv6.Arguments()[^1]!="ws://[::1]:1780")throw new Exception("IPv6 endpoint in
 Reject(new(){Transport="file"});Reject(new(){ControlTransport="ftp"});
 Console.WriteLine("Configuration, identity, and argument checks passed.");
 
+
+const string active="""
+{"server":{"groups":[{"id":"office","clients":[{"id":"office-client","connected":true,"config":{"name":"Office","volume":{"muted":false,"percent":25}}}],"muted":false,"stream_id":"music"}],"streams":[{"id":"music","status":"playing"}]}}
+""";
+PlaybackState State(string json,string id="office-client") {using var document=JsonDocument.Parse(json);return PlaybackStatus.Read(document.RootElement,id);}
+if(State(active)!=new PlaybackState(true,true,"Office"))throw new Exception("Active office stream not reported as playing.");
+if(State(active.Replace("\"muted\":false","\"muted\":true")).Playing)throw new Exception("Muted client/group reported as playing.");
+if(State(active.Replace("\"status\":\"playing\"","\"status\":\"idle\"")).Playing)throw new Exception("Idle stream reported as playing.");
+if(State(active.Replace("\"connected\":true","\"connected\":false")).Playing)throw new Exception("Disconnected client reported as playing.");
+if(State(active,"another-client").Connected)throw new Exception("Unrelated client used for local playback status.");
+Console.WriteLine("Server playback state and muted/disconnected checks passed.");

@@ -1,0 +1,39 @@
+name: Windows self-hosted build
+on:
+  push:
+    branches: [main, 'feature/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: snapcast-build-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: [self-hosted, Windows]
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Set writable .NET install directory
+        shell: powershell
+        run: '"DOTNET_INSTALL_DIR=$env:RUNNER_TEMP\dotnet" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append'
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - name: Check configuration and argument handling
+        shell: powershell
+        run: |
+          dotnet run --project tests/Snapcast.Checks/Snapcast.Checks.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Configuration checks failed.' }
+      - name: Build installer
+        shell: powershell
+        run: .\installer\build.ps1 -Version '0.1.0.${{ github.run_number }}' -OutputDirectory "$env:RUNNER_TEMP\snapcast-output-${{ github.run_id }}"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: SnapcastWindows-x64
+          path: ${{ runner.temp }}\snapcast-output-${{ github.run_id }}\SnapcastWindows-*.exe
+          if-no-files-found: error
+          retention-days: 7
+

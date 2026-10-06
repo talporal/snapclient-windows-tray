@@ -1,0 +1,18 @@
+<Window x:Class="Snapcast.Tray.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Snapcast • Office audio">
+<Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"><ScrollViewer><StackPanel Spacing="18" Padding="28" MaxWidth="720" HorizontalAlignment="Stretch">
+<TextBlock Text="Snapcast" FontSize="32" FontWeight="SemiBold"/><TextBlock Text="Your Windows speakers, connected." Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+<InfoBar x:Name="Status" IsOpen="True" IsClosable="False" Title="Connecting to local service…"/>
+<TextBlock Text="Connection" FontSize="20" FontWeight="SemiBold"/>
+<TextBox x:Name="Host" Header="Snapserver hostname or IP address" PlaceholderText="192.168.1.100"/>
+<Grid ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><NumberBox x:Name="StreamPort" Header="Audio port" Minimum="1" Maximum="65535" Value="1704" SpinButtonPlacementMode="Compact"/><NumberBox x:Name="ControlPort" Grid.Column="1" Header="Control port" Minimum="1" Maximum="65535" Value="1705" SpinButtonPlacementMode="Compact"/></Grid>
+<TextBox x:Name="ClientName" Header="Player name"/>
+<TextBlock Text="Audio output" FontSize="20" FontWeight="SemiBold"/>
+<TextBox x:Name="Soundcard" Header="Device name or index (default follows Windows output)" Text="default"/>
+<Button Content="List devices visible before login" Click="ListDevices"/><TextBox x:Name="DeviceList" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="160"/>
+<StackPanel Orientation="Horizontal" Spacing="12"><Button Content="Apply volume" Click="ApplyVolume"/><ToggleSwitch x:Name="Mute" Header="Mute"/></StackPanel><Slider x:Name="Volume" Minimum="0" Maximum="100" Value="50" StepFrequency="1"/>
+<Expander Header="Advanced playback settings" HorizontalAlignment="Stretch"><StackPanel Spacing="12"><NumberBox x:Name="Latency" Header="Output latency adjustment (ms)" Minimum="-10000" Maximum="10000" Value="0"/><TextBox x:Name="SampleFormat" Header="Resampling (blank uses source format)" PlaceholderText="48000:16:2"/><ToggleSwitch x:Name="Exclusive" Header="Exclusive audio output"/><ComboBox x:Name="LogLevel" Header="Log detail" SelectedIndex="2"><x:String>trace</x:String><x:String>debug</x:String><x:String>info</x:String><x:String>notice</x:String><x:String>warning</x:String><x:String>error</x:String></ComboBox><TextBlock Text="Buffering and stream selection are managed by Snapserver/Music Assistant." TextWrapping="Wrap"/></StackPanel></Expander>
+<ToggleSwitch x:Name="Enabled" Header="Connect automatically and play at boot" IsOn="True"/>
+<StackPanel Orientation="Horizontal" Spacing="12"><Button Content="Save settings" Click="Save" Style="{StaticResource AccentButtonStyle}"/><Button Content="Reconnect" Click="Reconnect"/><Button Content="Hide to tray" Click="Hide"/></StackPanel>
+<Expander Header="Diagnostics" HorizontalAlignment="Stretch"><TextBox x:Name="Logs" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="260"/></Expander>
+<TextBlock Text="Playback is managed by the Windows service. Closing this interface does not stop it." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+</StackPanel></ScrollViewer></Grid></Window>

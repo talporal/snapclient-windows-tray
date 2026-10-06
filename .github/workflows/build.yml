@@ -1,6 +1,14 @@
 name: Windows self-hosted build
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'installer/**'
+      - 'Directory.Build.props'
+      - '.github/workflows/build.yml'
 permissions:
   contents: read
 concurrency:
@@ -8,7 +16,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
-    runs-on: [self-hosted, Windows]
+    runs-on: [self-hosted, Windows, X64, snapcast]
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v6

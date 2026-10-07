@@ -1,25 +1,25 @@
 param([Parameter(Mandatory=$true)][string]$InstallRoot)
 $ErrorActionPreference='Stop'
-$serviceName='SnapcastWindows'
-$exe=Join-Path $InstallRoot 'Service\Snapcast.Service.exe'
-if(!(Test-Path -LiteralPath $exe)){throw 'Service executable missing.'}
-$build=[int](Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion').CurrentBuildNumber
-if($build -lt 22000){throw 'Windows 11 or Windows Server 2025 Desktop Experience is required.'}
-$data=Join-Path $env:ProgramData 'SnapcastWindows'
+$serviceName='SendspinWindows'
+$exe=Join-Path $InstallRoot 'Service\Sendspin.Service.exe'
+if(!(Test-Path $exe)){throw 'Sendspin service executable is missing.'}
+$data=Join-Path $env:ProgramData 'SendspinWindows'
 New-Item -ItemType Directory -Force -Path $data | Out-Null
-# Service can update config; interactive users read it but cannot replace privileged binaries.
 & icacls.exe $data /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-19:(OI)(CI)M' '*S-1-5-11:(OI)(CI)RX' | Out-Null
-if($LASTEXITCODE -ne 0){throw 'Configuration ACL setup failed.'}
-foreach($name in @('AudioEndpointBuilder','Audiosrv')) {Set-Service $name -StartupType Automatic;Start-Service $name}
+if($LASTEXITCODE -ne 0){throw 'Settings ACL configuration failed.'}
+foreach($name in @('AudioEndpointBuilder','Audiosrv')){Set-Service $name -StartupType Automatic;Start-Service $name}
 $existing=Get-Service $serviceName -ErrorAction SilentlyContinue
 if($existing){
- if($existing.Status -ne 'Stopped'){Stop-Service $serviceName -Force;$existing.WaitForStatus('Stopped',[TimeSpan]::FromSeconds(20))}
+ if($existing.Status -ne 'Stopped'){Stop-Service $serviceName -Force;$existing.WaitForStatus('Stopped',[TimeSpan]::FromSeconds(30))}
  & sc.exe config $serviceName binPath= ('"'+$exe+'"') start= auto obj= 'NT AUTHORITY\LocalService' depend= 'Audiosrv/AudioEndpointBuilder' | Out-Null
-} else {
- & sc.exe create $serviceName binPath= ('"'+$exe+'"') start= auto obj= 'NT AUTHORITY\LocalService' DisplayName= 'Snapcast Windows Audio' depend= 'Audiosrv/AudioEndpointBuilder' | Out-Null
+}else{
+ & sc.exe create $serviceName binPath= ('"'+$exe+'"') start= auto obj= 'NT AUTHORITY\LocalService' DisplayName= 'Sendspin Windows Speaker' depend= 'Audiosrv/AudioEndpointBuilder' | Out-Null
 }
-if($LASTEXITCODE -ne 0){throw 'Service registration failed.'}
-& sc.exe description $serviceName 'Plays Snapcast audio independently of interactive logins.' | Out-Null
+if($LASTEXITCODE -ne 0){throw 'Sendspin service registration failed.'}
+& sc.exe description $serviceName 'Local Sendspin speaker with automatic discovery and Windows audio output.' | Out-Null
 & sc.exe failure $serviceName reset= 86400 actions= 'restart/5000/restart/10000/restart/30000' | Out-Null
+# Scoped mDNS rule for this executable on trusted Windows network profiles.
+$rule='SendspinWindows-mDNS'
+Get-NetFirewallRule -Name $rule -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+New-NetFirewallRule -Name $rule -DisplayName 'Sendspin Windows discovery' -Direction Inbound -Program $exe -Protocol UDP -LocalPort 5353 -Profile Private,Domain -Action Allow | Out-Null
 Start-Service $serviceName
-

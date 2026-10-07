@@ -50,13 +50,13 @@ jobs:
       - name: Check configuration and argument handling
         shell: powershell
         run: |
-          dotnet run --project tests/Snapcast.Checks/Snapcast.Checks.csproj -c Release
+          dotnet run --project tests/Sendspin.Checks/Sendspin.Checks.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Configuration checks failed.' }
       - name: Build installer from source
         shell: powershell
-        run: .\installer\build.ps1 -Version '0.1.1.${{ github.run_number }}' -OutputDirectory "$env:RUNNER_TEMP\snapcast-output-${{ github.run_id }}"
+        run: .\installer\build.ps1 -Version '0.2.0.${{ github.run_number }}' -OutputDirectory "$env:RUNNER_TEMP\sendspin-output-${{ github.run_id }}"
       - name: Publish installer directly to GitHub Releases
         shell: powershell
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: .\.github\scripts\publish-release.ps1 -Directory "$env:RUNNER_TEMP\snapcast-output-${{ github.run_id }}" -Title 'Snapcast Windows'
+        run: .\.github\scripts\publish-release.ps1 -Directory "$env:RUNNER_TEMP\sendspin-output-${{ github.run_id }}" -Title 'Sendspin Windows'

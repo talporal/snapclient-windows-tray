@@ -1,0 +1,28 @@
+<Window x:Class="Sendspin.Windows.Tray.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Sendspin · Windows speaker" Width="750" Height="920" MinWidth="600" MinHeight="620" Background="#111A21" WindowStartupLocation="CenterScreen">
+<ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="30">
+<Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="SENDSPIN" Foreground="#67E8D1" FontSize="12" FontWeight="Bold"/><TextBlock Text="Your computer. A speaker." FontSize="28" FontWeight="SemiBold" Margin="0,6,0,8"/><TextBlock Text="A local audio player. No Home Assistant sign-in." Foreground="#94A8B6"/></StackPanel><Image x:Name="AppImage" Width="56" Height="56" Grid.Column="1"/></Grid>
+<Border Background="#1D2A33" CornerRadius="12" Padding="16" Margin="0,22,0,20"><StackPanel><TextBlock x:Name="Status" Text="Connecting to the Windows service…" TextWrapping="Wrap" FontWeight="SemiBold"/><TextBlock x:Name="Stats" Foreground="#94A8B6" Margin="0,5,0,0" TextWrapping="Wrap"/></StackPanel></Border>
+<Border Background="#19242D" CornerRadius="12" Padding="20"><StackPanel>
+<TextBlock Text="Server connection" FontSize="19" FontWeight="SemiBold" Margin="0,0,0,12"/>
+<TextBlock Text="Discovered Sendspin servers"/><ComboBox x:Name="Servers" SelectionChanged="ChooseServer"/>
+<StackPanel Orientation="Horizontal" Margin="0,0,0,14"><Button Content="Refresh discovery" Click="Discover"/><Button Content="Use automatic selection" Click="AutoSelect"/></StackPanel>
+<TextBlock Text="Address"/><TextBox x:Name="Host" ToolTip="Leave blank to use the only discovered server automatically."/>
+<Grid><Grid.ColumnDefinitions><ColumnDefinition Width="130"/><ColumnDefinition Width="16"/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Port"/><TextBox x:Name="Port" Text="8927"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="WebSocket path"/><TextBox x:Name="Endpoint" Text="/sendspin"/></StackPanel></Grid>
+<TextBlock Text="Player name"/><TextBox x:Name="PlayerName"/>
+<CheckBox x:Name="EnableDiscovery" Content="Discover servers on the local network" IsChecked="True"/>
+<TextBlock Text="With no saved address, one discovered server connects automatically. If several are found, choose one above." Foreground="#94A8B6" TextWrapping="Wrap" Margin="0,6,0,0"/>
+</StackPanel></Border>
+<Border Background="#19242D" CornerRadius="12" Padding="20" Margin="0,16,0,0"><StackPanel>
+<TextBlock Text="Audio output" FontSize="19" FontWeight="SemiBold" Margin="0,0,0,12"/>
+<TextBlock Text="Device"/><ComboBox x:Name="Devices"/>
+<StackPanel Orientation="Horizontal"><Button Content="Refresh devices" Click="RefreshDevices"/><Button Content="Test speakers" Click="TestSpeakers"/></StackPanel>
+<TextBlock Text="The test plays a short tone through the service. Device changes apply when you save." Foreground="#94A8B6" TextWrapping="Wrap" Margin="0,12,0,8"/>
+<Grid Margin="0,8,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="100"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Volume"/><Slider x:Name="Volume" Minimum="0" Maximum="100" Value="75" Margin="0,10,16,10"/></StackPanel><CheckBox x:Name="Mute" Grid.Column="1" Content="Mute" VerticalAlignment="Center"/></Grid>
+<Button Content="Apply volume" Click="ApplyVolume" HorizontalAlignment="Left"/>
+<Expander Header="Buffer settings"><Grid Margin="0,14,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="16"/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Output buffer (20–500 ms)"/><TextBox x:Name="OutputBuffer" Text="100"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="Network buffer (50–2000 ms)"/><TextBox x:Name="NetworkBuffer" Text="150"/></StackPanel></Grid></Expander>
+</StackPanel></Border>
+<CheckBox x:Name="Enabled" Content="Connect automatically when the service is running" IsChecked="True" Margin="0,20,0,14"/>
+<StackPanel Orientation="Horizontal"><Button x:Name="SaveButton" Content="Save and reconnect" Click="Save" Background="#67E8D1" Foreground="#10251F"/><Button Content="Restart service" Click="Restart"/><Button Content="Hide to tray" Click="Hide"/></StackPanel>
+<Expander Header="Service diagnostics"><TextBox x:Name="Logs" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" Height="220" VerticalScrollBarVisibility="Auto" Margin="0,12,0,0"/></Expander>
+<TextBlock Text="Closing the settings window keeps the tray and audio service running." Foreground="#94A8B6" TextWrapping="Wrap" Margin="0,20,0,0"/>
+</StackPanel></ScrollViewer></Window>

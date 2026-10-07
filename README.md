@@ -1,65 +1,44 @@
-# Snapcast Windows
+# Sendspin Windows Speaker
 
-C# Windows service and WinUI 3 tray controls. Target: Windows 11 and Windows Server 2025 Desktop Experience, x64. Older Windows versions are outside support scope.
+This repository replaces its previous Snapcast implementation with a **Sendspin-only** C# Windows service and desktop tray/settings app. The repository name remains `snapclient-windows-tray` to preserve project continuity. Windows 11 and Windows Server 2025 Desktop Experience, x64.
 
-## Architecture
+## First milestone: normal desktop playback
 
-The boot-start LocalService service owns the bundled Snapclient process in Session 0. It supervises crashes with bounded retry intervals. A kernel job closes child processes when the service exits. Snapclient handles streaming and synchronization; the tray app is included in the installer but is not required for playback. No interactive auto-login is configured.
+Install the release while signed into Windows. Right-click the play/network-wave tray icon for **Settings**, **Restart service**, or **Exit app**. Closing the settings window hides it; Exit asks whether to stop the service too. Playback belongs to the service, not the GUI. Restart/stop requests Windows administrator approval.
 
-The tray app starts at sign-in and provides host/audio/control ports, automatic playback, player name, device listing from the service session, output selection, shared/exclusive mode, resampling, latency, volume/mute, reconnect, and a bounded diagnostic log. Closing the window hides it. Right-click the custom play/network-wave tray icon for Open GUI, Restart service, and Exit app. Exit asks whether to keep playback running or stop the service. Service restart/stop uses a fixed installed helper with Windows administrator approval; cancelling approval leaves the tray open. Icon color reflects server-confirmed stream activity: green playing, cyan connected/idle, grey disconnected, red service/status unavailable. This reports Snapserver status, not a physical speaker measurement. Stream routing, buffering and office playlist automation remain server/Music Assistant responsibilities.
+1. Open Settings. Wait for discovered Sendspin servers, select one, then Save and reconnect. Or enter an address, port (usually 8927) and WebSocket path (usually `/sendspin`). With a blank address, exactly one discovered server is selected automatically; multiple servers require a choice.
+2. Select the physical Windows output from the device dropdown. Save, then use **Test speakers** and confirm the short tone is audible. The test briefly interrupts/reconnects any active stream.
+3. In Music Assistant or another Sendspin server, choose this computer's player name and play music. The app does not log into Home Assistant or Music Assistant; the server sends audio to it over the local Sendspin endpoint.
+4. Confirm tray/settings work, audible playback works and music continues with the settings window hidden. Then test exit tray while keeping the service running.
 
-Authenticated local users can control this shared office player through an ACL-protected named pipe. Network logons are denied pipe access. Configuration is in `%ProgramData%\SnapcastWindows`; executable paths are fixed in Program Files and cannot be configured through IPC. Administrators and the service can write stored settings; other users can submit validated changes through the pipe. Use this only where signed-in local users are trusted to control office playback.
+**Physical playback and desktop GUI operation still require target-host acceptance.** CI compilation/protocol checks are not evidence that the speakers produced sound. Login-screen/pre-login playback is deliberately deferred until this milestone works.
 
-## Install and configure
+## Settings and discovery
 
-Download the installer from this repository's Releases and run its installer as an administrator. Both the service and tray app are installed. Enter the Snapserver hostname/IP in the tray controls and save. The Music Assistant preset selects WebSocket audio and HTTP control on 1780. Plain Snapcast defaults are TCP audio 1704 and TCP control 1705; match the actual server configuration (Music Assistant may expose different ports/transports). Volume and name controls require the selected TCP or HTTP(S) control API to be reachable. WebSocket and secure WebSocket audio are supported; secure connections use normal certificate verification. Use List devices to select a physical output visible to LocalService. Avoid an RDP session-only output.
+Player name, server address/port/path, output device, automatic connection, discovery, volume/mute, Windows output buffer and network buffering are saved in `%ProgramData%\SendspinWindows\settings.json`. Client identity persists across service restarts. Empty device ID follows the Windows multimedia default output; an unavailable selected device reports an error rather than silently choosing a different device. Avoid RDP-only audio endpoints when selecting the physical speakers.
 
-Installer enables Windows Audio and Audio Endpoint Builder automatic startup and registers SnapcastWindows with service recovery. Upgrades stop the old service and tray process. Uninstall preserves configuration. The service plays only when enabled and a host is configured.
+Discovery uses `_sendspin-server._tcp.local.` mDNS on the LAN; it may not cross VM/VLAN/network boundaries. Manual address/port works independently. The installer adds a program-scoped UDP 5353 rule on Private/Domain profiles. Client-initiated connections are used; the app does not advertise a competing server-initiated listener.
 
-## Build
+## Dependencies and protocol compatibility
 
-The Actions workflow runs directly in this repository on a Windows x64 self-hosted runner named `T-NET-SERVER`. It builds main-branch code changes and supports manual dispatch. Every successful build publishes its installer directly as a development release. Build logs remain under Actions. Actions artifact uploads are not used. There is no GitHub-hosted fallback or pull-request trigger. The temporary windows-ha-sidebar build bridge has been retired.
+The service uses Sendspin.SDK **9.3.3**, the upstream maintained plaintext compatibility line, and NAudio.Wasapi **2.2.1** for the built-in Windows audio backend. PCM, Opus and FLAC decoding, time probes, timed buffering and bounded sync correction are provided by the SDK. The only advertised role is `player@v1`; no account sign-in, artwork or controller role is needed. This build does not implement the SDK 10.x encrypted/pairing protocol; use the server's compatible legacy Sendspin endpoint on a trusted LAN.
 
-### One-time home runner registration
+The tray uses styled WPF and Windows notification-area integration. .NET is bundled. There is **no Snapclient executable, VC++ redistributable, Windows App SDK runtime, Python or Node runtime** in the installation. NuGet restores managed build dependencies, not separate user-installed runtimes. Third-party licenses are included in Notices.
 
-1. Open https://github.com/talporal/snapclient-windows-tray/settings/actions/runners/new and select Windows, x64.
-2. On T-NET-SERVER, open PowerShell as administrator and follow GitHub's download/extraction commands in a new directory such as `C:\\actions-runner-snapcast`.
-3. Run GitHub's generated configuration command for this repository. Use runner name `T-NET-SERVER`, and choose installation as a Windows service. Keep this installation separate from the sidebar runner's directory.
-4. Confirm the new runner is online in this repository's runner settings. Builds require the standard self-hosted, Windows and X64 labels and verify the runner name before compilation.
+## Upgrade and service
 
-The registration token is time-limited; enter it only on the host using GitHub's generated command. Do not commit it. Runner registration and Windows service installation require repository administration and access to the host; the connected code-editing tools cannot perform those steps.
+The installer retains the original app identity, stops/removes the old Snapcast service and tray registration, replaces their executable payload and installs SendspinWindows. Old Snapcast settings are preserved but are not imported as Sendspin server settings. The service runs as LocalService with access to its own settings directory. Authenticated local users control the shared speaker through a bounded, ACL-protected named pipe; network logons cannot use that pipe.
 
-Requirements on the Windows build machine: Windows SDK 26100, compatible WinUI XAML build tools and .NET 8 SDK. Workflow installs .NET into the runner temporary directory. The same Windows App SDK package version as the working sidebar is used. Inno Setup is initialized in the runner temp directory; the build does not install/start this application's service on the build PC.
+No test before login is required for packaging. The installed service is configured for automatic startup, but boot-screen audio behavior is not part of the first acceptance milestone.
+
+## Builds and downloads
+
+Every successful build publishes the installer **directly to GitHub Releases** as a development release. No Actions artifact upload/download step is used. Source compilation/checks run only on the confirmed home self-hosted Windows runner `T-NET-SERVER`; no GitHub-hosted fallback. Build output is clean, with unique temporary package directories. Pushes to main or manual workflow dispatch build this repository directly.
 
 ```powershell
-.\installer\build.ps1 -Version 0.1.0 -OutputDirectory .\artifacts
+.\installer\build.ps1 -Version 0.2.0 -OutputDirectory .\artifacts
 ```
 
-Snapclient download is version-pinned and SHA-256 checked. The VC runtime and installer bootstrapper signatures are checked. The installer includes .NET/Windows App SDK runtimes, the Snapclient engine and exact upstream source archive.
+Requires a Windows .NET 8 SDK. Installer tooling is initialized in the runner's temporary directory. Tests cover connection settings, stable identity, PCM decoding, output callback silence/gain semantics and an actual local Sendspin WebSocket handshake/audio dispatch with a fake output backend. They do not install a service or request physical audio from the build machine.
 
-## Tray startup diagnostics
-
-The tray startup log is `%LOCALAPPDATA%\SnapcastWindows\tray-startup.log`. Published GUI initialization and icon assets are checked during packaging with `--smoke-test`; the check does not install or control a service. The window is activated before shell integration and hidden for background launches. Tray registration retries if Explorer is not ready, and opening the app again signals the existing per-session instance to show the GUI. Fatal startup exceptions are recorded and reported.
-
-The VC runtime bootstrapper is included only once for setup; upgrades remove the previous duplicate from the engine directory.
-
-## Required physical-host acceptance checks
-
-**Not yet verified on the target host.** A successful compile is not proof of service-session sound.
-
-1. Install, configure server/device and confirm speakers produce audio.
-2. Reboot, leave the machine at the login screen, send playback from HA/MA and confirm sound physically.
-3. Sign in, change volume/output; use Exit tray only, then log out and confirm audio continues. Reopen the GUI; verify Restart service, Cancel exit, and Stop service and exit, including cancelled UAC approval.
-4. Disconnect/reconnect network; restart Snapserver; confirm recovery.
-5. Unplug/replug the output device and inspect recovery/logs.
-6. Connect/disconnect RDP and verify physical output remains selected.
-7. Upgrade and uninstall; verify only this app's service/tray registration changes.
-
-If LocalService cannot render to the target driver/device in Session 0, diagnose its permissions and audio initialization before changing service identity. The project does not fall back to an interactive user session, because that would violate pre-login playback.
-
-## Current limits
-
-No automatic app updates, mDNS discovery, server group/stream editor, or installer code-signing yet. Hostname/IP persistence provides automatic connection. Tray volume starts at 50 as a proposed control value; the UI does not yet mirror server-side volume changes. Diagnostics report process state separately from server-confirmed connection; they do not claim audible output.
-
-
-The packaging check launches the published tray in an interactive desktop when available. A service runner without permission to create an interactive test task reports startup as unverified; this is not a successful UI test. Tray startup diagnostics are written to `%LOCALAPPDATA%\SnapcastWindows\tray-startup.log`.
+GUI failures are recorded in `%LOCALAPPDATA%\SendspinWindows\tray-startup.log`. The Settings diagnostics panel shows service, connection and audio-output messages plus rendered-frame counts. A rendering count confirms samples reached the backend callback, not that an attached speaker was audible.

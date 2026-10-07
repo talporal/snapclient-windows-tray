@@ -1,8 +1,13 @@
-# Bundled components
+# Third-party notices
 
-Snapclient v0.35.0 is a separate, unmodified executable from https://github.com/snapcast/snapcast/releases/tag/v0.35.0, licensed GPL-3.0-or-later by its contributors. Its corresponding upstream source archive is installed in Notices/snapcast-v0.35.0-source.zip; the archive contains its license and dependency notices. Snapclient's DLLs retain their upstream licenses.
+This wrapper is MIT licensed. Managed dependencies are restored with exact versions in the project files. Transitive dependencies carry their respective licenses in the NuGet packages.
 
-Microsoft Visual C++ Redistributable is installed using Microsoft's signed installer supplied with the upstream package. Microsoft .NET and Windows App SDK runtimes are included through self-contained publishing, with their upstream notices.
+- Sendspin.SDK 9.3.3 — MIT — https://github.com/Sendspin/sendspin-dotnet
+- NAudio.Wasapi / NAudio.Core 2.2.1 — MIT — https://github.com/naudio/NAudio
+- Concentus 2.2.2 — BSD-3-Clause — https://github.com/lostromb/concentus
+- Zeroconf 3.7.16 — MIT — https://github.com/novotnyllc/Zeroconf
+- Makaretu.Dns.Multicast 0.27.0 — MIT — https://github.com/richardschneider/net-mdns
+- Microsoft .NET runtime and Microsoft.Extensions libraries — MIT — https://github.com/dotnet/runtime
+- Inno Setup 7.1.0 is used to build the installer; https://github.com/jrsoftware/issrc
 
-The application/service source in this repository is MIT licensed. No proprietary changes to Snapclient are included.
-
+Snapcast/Snapclient is no longer bundled or used. The old GPL Snapclient engine and source archive are removed from the application payload during upgrade.

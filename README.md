@@ -4,7 +4,7 @@ This repository replaces its previous Snapcast implementation with a **Sendspin-
 
 ## First milestone: normal desktop playback
 
-Install the release while signed into Windows. Right-click the play/network-wave tray icon for **Settings**, **Restart service**, or **Exit app**. Closing the settings window hides it; Exit asks whether to stop the service too. Playback belongs to the service, not the GUI. Restart/stop requests Windows administrator approval.
+Install the release while signed into Windows. The compact main window shows status, server, output and live volume/mute. Gear buttons reveal server/audio settings; Diagnostics opens the diagnostic panel. Volume changes apply without an Apply button, and setting-file writes are coalesced after slider movement. “Enable playback and reconnect automatically” controls connection/retry, not Windows service startup. Right-click the play/network-wave tray icon for **Settings**, **Restart service**, or **Exit app**. Closing the settings window hides it; Exit asks whether to stop the service too. Playback belongs to the service, not the GUI. Restart/stop requests Windows administrator approval.
 
 1. Open Settings. Wait for discovered Sendspin servers, select one, then Save and reconnect. Or enter an address, port (usually 8927) and WebSocket path (usually `/sendspin`). With a blank address, exactly one discovered server is selected automatically; multiple servers require a choice.
 2. Select the physical Windows output from the device dropdown. Save, then use **Test speakers** and confirm the short tone is audible. The test briefly interrupts/reconnects any active stream.

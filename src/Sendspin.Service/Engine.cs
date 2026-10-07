@@ -12,8 +12,9 @@ public sealed class Engine {
  readonly object gate=new();readonly ConcurrentQueue<string> logs=new();readonly ILoggerFactory loggerFactory;
  readonly string file=System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),"SendspinWindows","settings.json");
  Settings settings=new();long revision;int testRequested;volatile bool connected,playing;long frames;string message="Starting Sendspin discovery";
- readonly MdnsServerDiscovery discovery;
+ readonly MdnsServerDiscovery discovery;readonly Timer volumeSaveTimer;AudioPipeline? activePipeline;bool volumeDirty;
  public Engine() {
+  volumeSaveTimer=new Timer(_=>{lock(gate){try{FlushVolume();}catch(Exception e){Log("Volume settings save failed: "+e.Message);}}},null,Timeout.Infinite,Timeout.Infinite);
   loggerFactory=LoggerFactory.Create(b=>b.SetMinimumLevel(LogLevel.Information).AddProvider(new RingLogProvider(Log)));
   discovery=new(loggerFactory.CreateLogger<MdnsServerDiscovery>());
   discovery.ServerFound+=(_,s)=>Log("Discovered "+s.Name+" at "+s.Host+":"+s.Port);
@@ -24,7 +25,7 @@ public sealed class Engine {
  }
  public Settings Config {get{lock(gate)return settings;}}
  public long Revision=>Interlocked.Read(ref revision);
- public void Save(Settings value){value.Validate();lock(gate){value=value with{ClientId=settings.ClientId};File.WriteAllText(file+".tmp",JsonSerializer.Serialize(value,Protocol.Json));File.Move(file+".tmp",file,true);settings=value;Interlocked.Increment(ref revision);}}
+ public void Save(Settings value){value.Validate();lock(gate){value=value with{ClientId=settings.ClientId};File.WriteAllText(file+".tmp",JsonSerializer.Serialize(value,Protocol.Json));File.Move(file+".tmp",file,true);settings=value;volumeDirty=false;volumeSaveTimer.Change(Timeout.Infinite,Timeout.Infinite);Interlocked.Increment(ref revision);}}
  public void Restart()=>Interlocked.Increment(ref revision);
  public void TestAudio(){Interlocked.Exchange(ref testRequested,1);Restart();}
  public void Log(string text){logs.Enqueue($"{DateTimeOffset.Now:HH:mm:ss} {text}");while(logs.Count>200)logs.TryDequeue(out _);}
@@ -48,6 +49,7 @@ public sealed class Engine {
     if(server is null){StateOnce(Servers.Length>1?"Several servers found. Select one in Settings.":"Searching for a Sendspin server; you can also enter an address.");await Task.Delay(1000,token);continue;}
     await using var session=new Session(loggerFactory,config,Log,n=>Interlocked.Add(ref frames,n));
     try {
+     lock(gate)activePipeline=session.Pipeline;
      connected=false;playing=false;State("Connecting to "+server);
      session.Client.ConnectionStateChanged+=(_,e)=>{connected=e.NewState==ConnectionState.Connected;if(!connected)playing=false;Log("Connection: "+e.NewState+" "+e.Reason);};
      session.Pipeline.StateChanged+=(_,state)=>{playing=state==AudioPipelineState.Playing;Volatile.Write(ref message,playing?"Sendspin stream rendering to Windows audio":"Connected to Sendspin · "+state);};
@@ -57,19 +59,21 @@ public sealed class Engine {
      await session.Client.SendPlayerStateAsync(config.Volume,config.Muted);
      int volume=config.Volume;bool muted=config.Muted;
      while(!token.IsCancellationRequested && Revision==generation && session.Client.ConnectionState!=ConnectionState.Disconnected) {
-      var current=Config;session.Pipeline.SetVolume(current.Volume);session.Pipeline.SetMuted(current.Muted);
+      Settings current;lock(gate){current=settings;session.Pipeline.SetVolume(current.Volume);session.Pipeline.SetMuted(current.Muted);}
       if(current.Volume!=volume||current.Muted!=muted){await session.Client.SendPlayerStateAsync(current.Volume,current.Muted);volume=current.Volume;muted=current.Muted;}
       await Task.Delay(500,token);
      }
     }catch(OperationCanceledException) when(token.IsCancellationRequested){break;}catch(Exception e){State("Sendspin: "+e.Message);}
-    finally {connected=false;playing=false;}
+    finally {lock(gate)activePipeline=null;connected=false;playing=false;}
     if(Revision==generation)await Task.Delay(3000,token);
    }
   }catch(OperationCanceledException) when(token.IsCancellationRequested){}
-  finally{connected=false;playing=false;await discovery.DisposeAsync();loggerFactory.Dispose();}
+  finally{volumeSaveTimer.Dispose();lock(gate){try{FlushVolume();}catch(Exception e){Log("Volume settings save failed: "+e.Message);}}connected=false;playing=false;await discovery.DisposeAsync();loggerFactory.Dispose();}
  }
  void StateOnce(string text){if(Volatile.Read(ref message)!=text)State(text);}
- public void Volume(int percent,bool mute){if(percent is <0 or >100)throw new ArgumentException("Volume must be 0–100.");lock(gate){settings=settings with{Volume=percent,Muted=mute};File.WriteAllText(file+".tmp",JsonSerializer.Serialize(settings,Protocol.Json));File.Move(file+".tmp",file,true);}}
+ void FlushVolume(){if(!volumeDirty)return;File.WriteAllText(file+".tmp",JsonSerializer.Serialize(settings,Protocol.Json));File.Move(file+".tmp",file,true);volumeDirty=false;}
+ public void Volume(int percent,bool mute){if(percent is <0 or >100)throw new ArgumentException("Volume must be 0–100.");lock(gate){settings=settings with{Volume=percent,Muted=mute};activePipeline?.SetVolume(percent);activePipeline?.SetMuted(mute);volumeDirty=true;volumeSaveTimer.Change(750,Timeout.Infinite);}}
+
 }
 public sealed class Session:IAsyncDisposable {
  public SendspinClientService Client {get;}

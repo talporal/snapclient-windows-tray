@@ -73,6 +73,23 @@ public partial class MainWindow:Window {
  async void TestSpeakers(object sender,RoutedEventArgs e){if(editing)return;editing=true;try{if(await SaveSettings("audio")){UpdateSummary();await Call(new("test-audio"));}}finally{editing=false;}}
  void ToggleServerSettings(object sender,RoutedEventArgs e){AudioSettings.Visibility=Visibility.Collapsed;ServerSettings.Visibility=ServerSettings.Visibility==Visibility.Visible?Visibility.Collapsed:Visibility.Visible;}
  async void ToggleAudioSettings(object sender,RoutedEventArgs e){ServerSettings.Visibility=Visibility.Collapsed;AudioSettings.Visibility=AudioSettings.Visibility==Visibility.Visible?Visibility.Collapsed:Visibility.Visible;if(AudioSettings.Visibility==Visibility.Visible)await LoadDevices();}
+ async void CopyLogs(object sender,RoutedEventArgs e){
+  CopyLogsButton.IsEnabled=false;CopyLogsStatus.Text="Fetching current service logs…";
+  try{
+   var response=await Call(new("status"),false);
+   if(response?.Ok!=true){CopyLogsStatus.Text="Could not refresh the service logs. Nothing was copied.";return;}
+   var captured=DateTimeOffset.Now;
+   var text=$"Sendspin service diagnostics · captured {captured:yyyy-MM-dd HH:mm:ss zzz}"+Environment.NewLine+
+    $"Connected: {response.Connected} · Playing: {response.Playing} · Frames rendered: {response.FramesRendered}"+Environment.NewLine+
+    response.Message+Environment.NewLine+Environment.NewLine+string.Join(Environment.NewLine,response.Logs??[]);
+   for(int attempt=0;;attempt++){
+    try{System.Windows.Clipboard.SetText(text);break;}
+    catch(System.Runtime.InteropServices.COMException) when(attempt<2){await Task.Delay(100);}
+   }
+   CopyLogsStatus.Text=$"Copied {response.Logs?.Length??0} log entries at {captured:HH:mm:ss}. Ready to paste.";
+  }catch(Exception error){CopyLogsStatus.Text="Could not copy logs: "+error.Message;}
+  finally{CopyLogsButton.IsEnabled=true;}
+ }
  void ToggleDiagnostics(object sender,RoutedEventArgs e)=>DiagnosticsPanel.Visibility=DiagnosticsPanel.Visibility==Visibility.Visible?Visibility.Collapsed:Visibility.Visible;
  void UpdateSummary(){
   ServerInfo.Text=config.Host==""?"Automatic server discovery":$"{config.Host}:{config.Port}";

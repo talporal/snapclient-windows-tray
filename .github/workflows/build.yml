@@ -7,6 +7,8 @@ on:
       - 'src/**'
       - 'tests/**'
       - 'installer/**'
+      - 'notices/**'
+      - 'THIRD-PARTY-NOTICES.md'
       - 'Directory.Build.props'
       - '.github/workflows/build.yml'
       - '.github/scripts/**'
@@ -47,7 +49,7 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '8.0.x'
-      - name: Check configuration and argument handling
+      - name: Check configuration, protocol, and audio handling
         shell: powershell
         run: |
           dotnet run --project tests/Sendspin.Checks/Sendspin.Checks.csproj -c Release

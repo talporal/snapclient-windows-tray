@@ -32,7 +32,10 @@ public sealed class WasapiPlayer(string deviceId,int latencyMs,Action<string> lo
  void CloseOutput(){output?.Stop();output?.Dispose();output=null;device?.Dispose();device=null;enumerator?.Dispose();enumerator=null;}
  public ValueTask DisposeAsync(){if(!disposed){disposed=true;thread.Run(CloseOutput);thread.Dispose();}return ValueTask.CompletedTask;}
  public static DeviceEntry[] Devices() {
-  using var e=new MMDeviceEnumerator();var result=new List<DeviceEntry>{new("","Windows default output")};
+  using var e=new MMDeviceEnumerator();string defaultName;
+  try{using var current=e.GetDefaultAudioEndpoint(DataFlow.Render,Role.Multimedia);defaultName="Service default · "+current.FriendlyName;}
+  catch(System.Runtime.InteropServices.COMException){defaultName="Service default · no default output available";}
+  var result=new List<DeviceEntry>{new("",defaultName)};
   foreach(var d in e.EnumerateAudioEndPoints(DataFlow.Render,DeviceState.Active)){using(d)result.Add(new(d.ID,d.FriendlyName));}return result.ToArray();
  }
 }

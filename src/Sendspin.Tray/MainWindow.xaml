@@ -14,7 +14,9 @@
 </StackPanel></Border>
 <Border Background="#19242D" CornerRadius="12" Padding="20" Margin="0,16,0,0"><StackPanel>
 <TextBlock Text="Audio output" FontSize="19" FontWeight="SemiBold" Margin="0,0,0,12"/>
-<TextBlock Text="Device"/><ComboBox x:Name="Devices"/>
+<TextBlock Text="Outputs visible to the Windows service"/><ComboBox x:Name="Devices"/>
+<TextBlock x:Name="DeviceSummary" Text="Requesting the service's audio outputs…" Foreground="#94A8B6" TextWrapping="Wrap" Margin="0,0,0,8"/>
+<Expander Header="Service output list"><TextBox x:Name="ServiceOutputs" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True" MaxHeight="180" VerticalScrollBarVisibility="Auto"/></Expander>
 <StackPanel Orientation="Horizontal"><Button Content="Refresh devices" Click="RefreshDevices"/><Button Content="Test speakers" Click="TestSpeakers"/></StackPanel>
 <TextBlock Text="The test plays a short tone through the service. Device changes apply when you save." Foreground="#94A8B6" TextWrapping="Wrap" Margin="0,12,0,8"/>
 <Grid Margin="0,8,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="100"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Volume"/><Slider x:Name="Volume" Minimum="0" Maximum="100" Value="75" Margin="0,10,16,10"/></StackPanel><CheckBox x:Name="Mute" Grid.Column="1" Content="Mute" VerticalAlignment="Center"/></Grid>

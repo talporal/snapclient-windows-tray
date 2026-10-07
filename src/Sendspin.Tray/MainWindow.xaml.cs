@@ -12,7 +12,7 @@ namespace Sendspin.Windows.Tray;
 public partial class MainWindow:Window {
  readonly Forms.NotifyIcon tray=new();readonly Dictionary<TrayState,Drawing.Icon> icons=new();
  readonly DispatcherTimer timer=new(){Interval=TimeSpan.FromSeconds(2)};
- Settings config=new();bool loaded,busy,closed,editing,listsChanging;string? lastServerKey;string? lastDeviceId;Response? last;
+ Settings config=new();bool loaded,busy,closed,editing,listsChanging,devicesBusy;string? lastServerKey;string? lastDeviceId;Response? last;
  public MainWindow(){InitializeComponent();Closing+=OnClosing;AppImage.Source=new BitmapImage(new Uri(Path.Combine(AppContext.BaseDirectory,"Assets","App.ico")));Icon=AppImage.Source;timer.Tick+=async(_,_)=>await Refresh();}
  public void StartTray(){
   foreach(var state in Enum.GetValues<TrayState>())icons.Add(state,new Drawing.Icon(Path.Combine(AppContext.BaseDirectory,"Assets","Tray"+state+".ico")));
@@ -20,7 +20,7 @@ public partial class MainWindow:Window {
   var menu=new Forms.ContextMenuStrip();menu.Items.Add("Settings",null,(_,_)=>Dispatcher.InvokeAsync(()=>OpenSettings()));menu.Items.Add("Restart service",null,(_,_)=>Dispatcher.InvokeAsync(async()=>await ControlService("restart")));menu.Items.Add(new Forms.ToolStripSeparator());menu.Items.Add("Exit app…",null,(_,_)=>Dispatcher.InvokeAsync(async()=>await ExitTray()));
   tray.ContextMenuStrip=menu;tray.DoubleClick+=(_,_)=>Dispatcher.InvokeAsync(()=>OpenSettings());tray.Visible=true;timer.Start();_=Refresh();
  }
- public void OpenSettings(){Show();if(WindowState==WindowState.Minimized)WindowState=WindowState.Normal;Activate();}
+ public void OpenSettings(){Show();if(WindowState==WindowState.Minimized)WindowState=WindowState.Normal;Activate();if(loaded)_=LoadDevices();}
  void OnClosing(object? sender,CancelEventArgs e){if(!closed){e.Cancel=true;Hide();}}
  async Task<Response?> Call(Request request){try{var result=await Protocol.SendAsync(request);Status.Text=result.Message;return result;}catch(Exception e){Status.Text="Service unavailable: "+e.Message;tray.Icon=icons.GetValueOrDefault(TrayState.Unavailable);Diagnostics.Log("Service control",e);return null;}}
  async Task Refresh(){
@@ -34,7 +34,20 @@ public partial class MainWindow:Window {
   }finally{busy=false;}
  }
  void UpdateServers(ServerEntry[] servers){var key=string.Join("|",servers.Select(s=>$"{s.Name}:{s.Host}:{s.Port}:{s.Path}"));if(key==lastServerKey)return;lastServerKey=key;listsChanging=true;try{var selected=Servers.SelectedItem as ServerEntry;Servers.ItemsSource=servers;if(selected is not null)Servers.SelectedItem=servers.FirstOrDefault(s=>s.Host==selected.Host&&s.Port==selected.Port&&s.Path==selected.Path);}finally{listsChanging=false;}}
- async Task LoadDevices(){var r=await Call(new("devices"));if(r?.Ok!=true)return;var items=r.Devices??[];lastDeviceId=(Devices.SelectedItem as DeviceEntry)?.Id??config.DeviceId;Devices.ItemsSource=items;Devices.SelectedItem=items.FirstOrDefault(d=>d.Id==lastDeviceId);if(Devices.SelectedItem is null){var missing=new DeviceEntry(lastDeviceId,"Saved output is unavailable · choose another device");Devices.ItemsSource=items.Append(missing).ToArray();Devices.SelectedItem=missing;}}
+ async Task LoadDevices(){
+  if(devicesBusy)return;devicesBusy=true;
+  try {
+   DeviceSummary.Text="Refreshing outputs from the Windows service…";
+   var r=await Call(new("devices"));
+   if(r?.Ok!=true){DeviceSummary.Text="Could not list service outputs: "+(r?.Message??Status.Text);ServiceOutputs.Text=DeviceSummary.Text;return;}
+   var items=r.Devices??[];var physical=items.Where(d=>d.Id!="").ToArray();
+   DeviceSummary.Text=$"Service reports {physical.Length} active output(s). This list comes from the service, including when controls run over RDP.";
+   ServiceOutputs.Text=string.Join(Environment.NewLine+Environment.NewLine,items.Select(d=>d.Id==""?d.Name:d.Name+Environment.NewLine+"Device ID: "+d.Id));
+   if(physical.Length==0)ServiceOutputs.Text+=Environment.NewLine+Environment.NewLine+"No named active outputs were returned by the service.";
+   lastDeviceId=(Devices.SelectedItem as DeviceEntry)?.Id??config.DeviceId;Devices.ItemsSource=items;Devices.SelectedItem=items.FirstOrDefault(d=>d.Id==lastDeviceId);
+   if(Devices.SelectedItem is null){var missing=new DeviceEntry(lastDeviceId,"Saved output is unavailable · choose another device");Devices.ItemsSource=items.Append(missing).ToArray();Devices.SelectedItem=missing;}
+  }finally{devicesBusy=false;}
+ }
  void ChooseServer(object sender,SelectionChangedEventArgs e){if(listsChanging)return;if(Servers.SelectedItem is ServerEntry s){Host.Text=s.Host;Port.Text=s.Port.ToString();Endpoint.Text=s.Path;}}
  async void Discover(object sender,RoutedEventArgs e){var r=await Call(new("discover"));if(r?.Ok==true){UpdateServers(r.Servers??[]);Status.Text=(r.Servers?.Length??0)==0?"No server discovered yet. Check LAN/multicast connectivity or enter an address.":"Choose a discovered server above.";}}
  void AutoSelect(object sender,RoutedEventArgs e){Host.Text="";EnableDiscovery.IsChecked=true;Servers.SelectedItem=null;Status.Text="Save to automatically connect when exactly one server is discovered.";}

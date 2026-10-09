@@ -25,11 +25,12 @@ var rendered=0;var provider=new PullProvider(new PartialSource(),()=>0.5f,n=>ren
 Check(provider.Read(output,2,6)==6,"Audio callback stopped on short read.");Check(output[0]==9&&output[8]==9,"Callback wrote outside its requested range.");Check(output[2]==0.5f&&output[3]==-0.5f&&output.Skip(4).Take(4).All(v=>v==0),"Gain or silence padding failed.");Check(rendered==1,"Rendered frame count invalid.");
 var muted=new PullProvider(new PartialSource(),()=>0,_=>{});muted.Read(output,2,6);Check(output.Skip(2).Take(6).All(v=>v==0),"Mute did not silence audio.");
 Console.WriteLine("PASS: settings validation, identity persistence, PCM decoding and audio callback gain/mute/underrun checks.");
-// Exercise the actual SDK wiring used by the service over a real local WebSocket.
+// Exercise fresh sessions after abrupt loss, graceful close, and a silent half-open peer.
+for(int recoveryCase=0;recoveryCase<3;recoveryCase++) {
 var listener=new TcpListener(IPAddress.Loopback,0);listener.Start();var port=((IPEndPoint)listener.LocalEndpoint).Port;
-using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(15));
+using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(25));
 using var logging=LoggerFactory.Create(b=>b.AddConsole().SetMinimumLevel(LogLevel.Warning));
-var fake=new FakePlayer();await using var session=new Session(logging,settings,_=>{},_=>{},()=>fake);
+var fake=new FakePlayer();await using var session=new Session(logging,settings,_=>{},_=>{},()=>fake,TimeSpan.FromSeconds(3));
 var connect=session.Client.ConnectAsync(new Uri($"ws://127.0.0.1:{port}/sendspin"),deadline.Token);
 using var accepted=await listener.AcceptTcpClientAsync(deadline.Token);var stream=accepted.GetStream();
 var head=new StringBuilder();byte[] one=new byte[1];while(!head.ToString().EndsWith("\r\n\r\n")){Check(head.Length<16384,"Oversize WebSocket upgrade.");Check(await stream.ReadAsync(one,deadline.Token)==1,"Socket closed during upgrade.");head.Append((char)one[0]);}
@@ -55,8 +56,23 @@ await socket.SendAsync(chunk.AsMemory(),WebSocketMessageType.Binary,true,deadlin
 for(int i=0;i<100&&(session.Pipeline.BufferStats?.TotalSamplesWritten??0)==0;i++)await Task.Delay(20,deadline.Token);
 Check((session.Pipeline.BufferStats?.TotalSamplesWritten??0)>0,"Binary Sendspin audio did not reach the service's decoded buffer.");
 Console.WriteLine("PASS: real WebSocket Sendspin handshake, player-only capability, stable ID, stream initialization and binary PCM audio dispatch.");
-// Abort transport so client disposal cannot block behind a test server not servicing close frames.
+Check(!session.NeedsReconnect,"Healthy session was marked for reconnect.");
+if(recoveryCase==0)socket.Abort();
+else if(recoveryCase==1)
+ await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure,"server restart",deadline.Token);
+else {
+ // Keep TCP open but stop answering time probes: the same watchdog covers net8 half-open sockets.
+ await Task.Delay(3200,deadline.Token);
+ Check(session.Client.ConnectionState==Sendspin.SDK.Connection.ConnectionState.Connected,
+  "Silent-peer check must exercise a transport still marked Connected.");
+}
+for(int i=0;i<100&&!session.NeedsReconnect;i++)await Task.Delay(20,deadline.Token);
+Check(session.NeedsReconnect,"Connection loss did not request a fresh session.");
+await session.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(8),deadline.Token);
+Check(fake.State==AudioPlayerState.Stopped,"Failed session left its audio output running.");
 socket.Abort();listener.Stop();
+Console.WriteLine($"PASS: recovery case {recoveryCase}: loss detection and bounded cleanup; next iteration creates a fresh handshake/audio pipeline.");
+}
 sealed class PartialSource:IAudioSampleSource {
  public AudioFormat Format {get;}=new(){Codec="pcm",SampleRate=48000,Channels=2,BitDepth=16};
  public int Read(float[] buffer,int offset,int count){buffer[offset]=1;buffer[offset+1]=-1;return 2;}

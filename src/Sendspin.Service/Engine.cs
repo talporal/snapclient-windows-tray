@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Sendspin.SDK.Audio;
@@ -47,7 +48,7 @@ public sealed class Engine {
     if(config.Host!="")server=config.ServerUri();
     else if(config.Discover){var candidates=Servers;if(candidates.Length==1){var s=candidates[0];server=(config with{Host=s.Host,Port=s.Port,Path=s.Path}).ServerUri();}}
     if(server is null){StateOnce(Servers.Length>1?"Several servers found. Select one in Settings.":"Searching for a Sendspin server; you can also enter an address.");await Task.Delay(1000,token);continue;}
-    await using var session=new Session(loggerFactory,config,Log,n=>Interlocked.Add(ref frames,n));
+    var session=new Session(loggerFactory,config,Log,n=>Interlocked.Add(ref frames,n));
     try {
      lock(gate)activePipeline=session.Pipeline;
      connected=false;playing=false;State("Connecting to "+server);
@@ -55,17 +56,24 @@ public sealed class Engine {
      session.Pipeline.StateChanged+=(_,state)=>{playing=state==AudioPipelineState.Playing;Volatile.Write(ref message,playing?"Sendspin stream rendering to Windows audio":"Connected to Sendspin · "+state);};
      session.Pipeline.ErrorOccurred+=(_,e)=>{playing=false;State("Audio error: "+e.Message);};
      session.Client.PlayerStateChanged+=(_,s)=>{lock(gate)settings=settings with{Volume=s.Volume,Muted=s.Muted};};
-     await session.Client.ConnectAsync(server,token);connected=true;State("Connected to "+(session.Client.ServerName??server.Host));
+     using var connectDeadline=CancellationTokenSource.CreateLinkedTokenSource(token);
+     connectDeadline.CancelAfter(TimeSpan.FromSeconds(20));
+     await session.Client.ConnectAsync(server,connectDeadline.Token);connected=true;State("Connected to "+(session.Client.ServerName??server.Host));
      await session.Client.SendPlayerStateAsync(config.Volume,config.Muted);
      int volume=config.Volume;bool muted=config.Muted;
-     while(!token.IsCancellationRequested && Revision==generation && session.Client.ConnectionState!=ConnectionState.Disconnected) {
+     while(!token.IsCancellationRequested && Revision==generation && !session.NeedsReconnect) {
       Settings current;lock(gate){current=settings;session.Pipeline.SetVolume(current.Volume);session.Pipeline.SetMuted(current.Muted);}
       if(current.Volume!=volume||current.Muted!=muted){await session.Client.SendPlayerStateAsync(current.Volume,current.Muted);volume=current.Volume;muted=current.Muted;}
       await Task.Delay(500,token);
      }
+     if(Revision==generation&&!token.IsCancellationRequested)State("Connection recovery: "+session.ReconnectReason);
     }catch(OperationCanceledException) when(token.IsCancellationRequested){break;}catch(Exception e){State("Sendspin: "+e.Message);}
-    finally {lock(gate)activePipeline=null;connected=false;playing=false;}
-    if(Revision==generation)await Task.Delay(3000,token);
+    finally {
+     lock(gate)activePipeline=null;connected=false;playing=false;
+     try{await session.DisposeAsync();}catch(Exception e){Log("Session cleanup failed: "+e.Message);}
+     connected=false;playing=false;
+    }
+    if(Revision==generation){State("Disconnected · retrying in 3 seconds");await Task.Delay(3000,token);}
    }
   }catch(OperationCanceledException) when(token.IsCancellationRequested){}
   finally{volumeSaveTimer.Dispose();lock(gate){try{FlushVolume();}catch(Exception e){Log("Volume settings save failed: "+e.Message);}}connected=false;playing=false;await discovery.DisposeAsync();loggerFactory.Dispose();}
@@ -78,19 +86,39 @@ public sealed class Engine {
 public sealed class Session:IAsyncDisposable {
  public SendspinClientService Client {get;}
  public AudioPipeline Pipeline {get;}
- public Session(ILoggerFactory log,Settings config,Action<string> diagnostic,Action<int> frames,Func<IAudioPlayer>? outputFactory=null) {
+ readonly SendspinConnection connection;
+ readonly Action<string> diagnostic;
+ readonly TimeSpan receiveTimeout;
+ long lastReceived=Stopwatch.GetTimestamp();
+ public bool NeedsReconnect=>Client.ConnectionState!=ConnectionState.Connected ||
+  Stopwatch.GetElapsedTime(Interlocked.Read(ref lastReceived))>=receiveTimeout;
+ public string ReconnectReason=>Client.ConnectionState!=ConnectionState.Connected
+  ? "transport state is "+Client.ConnectionState
+  : "no server messages for "+(int)receiveTimeout.TotalSeconds+" seconds";
+ public Session(ILoggerFactory log,Settings config,Action<string> diagnostic,Action<int> frames,Func<IAudioPlayer>? outputFactory=null,TimeSpan? receiveTimeout=null) {
+  this.diagnostic=diagnostic;this.receiveTimeout=receiveTimeout??TimeSpan.FromSeconds(60);
   var clock=new KalmanClockSynchronizer(log.CreateLogger<KalmanClockSynchronizer>());
   Pipeline=new(log.CreateLogger<AudioPipeline>(),new AudioDecoderFactory(log),clock,
    (format,sync)=>new TimedAudioBuffer(format,sync,logger:log.CreateLogger<TimedAudioBuffer>()){TargetBufferMilliseconds=config.MinBufferMs},
    outputFactory??(()=>new WasapiPlayer(config.DeviceId,config.OutputLatencyMs,diagnostic,frames)),
    (buffer,time)=>new TimedSource(buffer,time));
-  var connection=new SendspinConnection(log.CreateLogger<SendspinConnection>());
+  // The service owns retries. Avoid overlapping SDK retries and reuse of a failed pipeline.
+  connection=new SendspinConnection(log.CreateLogger<SendspinConnection>(),new ConnectionOptions{AutoReconnect=false});
+  connection.TextMessageReceived+=(_,_)=>Interlocked.Exchange(ref lastReceived,Stopwatch.GetTimestamp());
+  connection.BinaryMessageReceived+=(_,_)=>Interlocked.Exchange(ref lastReceived,Stopwatch.GetTimestamp());
   Client=new(log.CreateLogger<SendspinClientService>(),connection,clock,new ClientCapabilities {
    ClientId="sendspin-windows-"+config.ClientId,ClientName=config.Name,ProductName="Sendspin Windows Speaker",Manufacturer="Sendspin Windows",SoftwareVersion="0.2.0",
    Roles=["player@v1"],RequiredLeadTimeMs=200,MinBufferMs=config.MinBufferMs,ExpectedOutputLatencyMs=config.OutputLatencyMs,InitialVolume=config.Volume,InitialMuted=config.Muted
   },Pipeline);
  }
- public async ValueTask DisposeAsync(){await Client.DisposeAsync();await Pipeline.DisposeAsync();}
+ public async ValueTask DisposeAsync(){
+  // A half-open peer must not hold teardown waiting indefinitely for a close response.
+  using var closeDeadline=new CancellationTokenSource(TimeSpan.FromSeconds(3));
+  try{await connection.DisconnectAsync("restart",closeDeadline.Token);}
+  catch(Exception e){diagnostic("Transport cleanup: "+e.Message);}
+  try{await Client.DisposeAsync();}
+  finally{await Pipeline.DisposeAsync();}
+ }
 }
 internal sealed class RingLogProvider(Action<string> log):ILoggerProvider {
  public ILogger CreateLogger(string categoryName)=>new RingLogger(log);
